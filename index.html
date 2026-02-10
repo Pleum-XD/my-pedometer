@@ -3,145 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micro:bit Runner Dashboard</title>
+    <title>Micro:bit Runner Pro</title>
     <style>
-        :root {
-            --primary: #4e73df;
-            --success: #1cc88a;
-            --dark: #5a5c69;
-        }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #f8f9fc; 
-            margin: 0; padding: 20px; color: var(--dark);
-        }
-        .container { max-width: 500px; margin: auto; }
-        .card { 
-            background: white; border-radius: 15px; padding: 25px; 
-            box-shadow: 0 10px 20px rgba(0,0,0,0.05); text-align: center;
-            margin-bottom: 20px;
-        }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
-        .stat-box { background: #f1f3f9; padding: 15px; border-radius: 10px; }
-        .value { font-size: 1.8em; font-weight: bold; color: var(--primary); display: block; }
-        .label { font-size: 0.8em; color: #858796; text-transform: uppercase; }
-        
-        input[type="number"] {
-            width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd; text-align: center;
-        }
-        button { 
-            background: var(--primary); color: white; border: none; 
-            padding: 12px 25px; border-radius: 30px; cursor: pointer; 
-            font-size: 16px; font-weight: bold; transition: 0.3s; width: 100%;
-        }
-        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(78,115,223,0.3); }
-        .history { font-size: 0.9em; color: #666; margin-top: 20px; text-align: left; }
+        :root { --primary: #007bff; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); text-align: center; padding: 20px; }
+        .card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
+        .step-display { font-size: 5rem; font-weight: 800; color: var(--primary); margin: 10px 0; transition: all 0.2s; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+        .box { background: #f1f3f5; padding: 15px; border-radius: 12px; }
+        .val { font-size: 1.2rem; font-weight: bold; display: block; }
+        .lbl { font-size: 0.8rem; color: #6c757d; text-transform: uppercase; }
+        button { background: var(--primary); color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; }
+        button:hover { opacity: 0.9; transform: scale(0.98); }
+        #status { font-size: 0.8rem; margin-top: 15px; color: #adb5bd; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="card">
-        <h2 style="margin-top:0">👟 Micro:bit Sync</h2>
-        <p>น้ำหนักตัว: <input type="number" id="weight" value="60" onchange="saveWeight()"> kg</p>
-        <button onclick="connectBluetooth()">เชื่อมต่อและดึงข้อมูล</button>
-        
-        <div style="margin-top: 30px;">
-            <span class="label">จำนวนก้าวทั้งหมด</span>
-            <span id="steps" class="value" style="font-size: 4em;">0</span>
-        </div>
+<div class="card">
+    <h2 style="margin-bottom: 5px;">👟 Dashboard</h2>
+    <p style="color: #6c757d; margin-bottom: 25px;">เครื่องนับก้าว Micro:bit</p>
+    
+    <button onclick="connectBluetooth()">เชื่อมต่อ Micro:bit</button>
 
-        <div class="stat-grid">
-            <div class="stat-box">
-                <span class="label">ระยะทาง (กม.)</span>
-                <span id="distance" class="value">0.00</span>
-            </div>
-            <div class="stat-box">
-                <span class="label">เผาผลาญ (kcal)</span>
-                <span id="calories" class="value">0.00</span>
-            </div>
+    <div class="step-display" id="display-steps">0</div>
+    <span class="lbl">จำนวนก้าวสะสม</span>
+
+    <div class="grid">
+        <div class="box">
+            <span class="lbl">ระยะทาง (กม.)</span>
+            <span class="val" id="display-dist">0.00</span>
+        </div>
+        <div class="box">
+            <span class="lbl">แคลอรี่ (kcal)</span>
+            <span class="val" id="display-cal">0.00</span>
         </div>
     </div>
 
-    <div class="card history" id="history-box">
-        <strong>บันทึกล่าสุด:</strong> <span id="last-sync">ยังไม่มีข้อมูล</span>
-    </div>
+    <div id="status">สถานะ: รอการเชื่อมต่อ</div>
 </div>
 
-
-
 <script>
-    let weightInput = document.getElementById('weight');
-    
-    // โหลดค่าน้ำหนักที่เคยกรอกไว้
-    window.onload = () => {
-        if(localStorage.getItem('userWeight')) {
-            weightInput.value = localStorage.getItem('userWeight');
-        }
-        loadLastSession();
-    };
-
-    function saveWeight() {
-        localStorage.setItem('userWeight', weightInput.value);
-    }
+    let uartChar;
 
     async function connectBluetooth() {
-        const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-        const UART_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+        const UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+        const UART_TX_CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
         try {
             const device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: 'BBC micro:bit' }],
-                optionalServices: [UART_SERVICE]
+                optionalServices: [UART_SERVICE_UUID]
             });
 
+            document.getElementById('status').innerText = "กำลังเชื่อมต่อ...";
             const server = await device.gatt.connect();
-            const service = await server.getPrimaryService(UART_SERVICE);
-            const characteristic = await service.getCharacteristic(UART_TX);
+            const service = await server.getPrimaryService(UART_SERVICE_UUID);
+            uartChar = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
 
-            await characteristic.startNotifications();
-            characteristic.addEventListener('characteristicvaluechanged', (e) => {
-                let val = new TextDecoder().decode(e.target.value);
-                processData(parseInt(val));
-            });
+            await uartChar.startNotifications();
+            uartChar.addEventListener('characteristicvaluechanged', handleIncomingData);
             
-            alert("เชื่อมต่อสำเร็จ! กำลังดึงข้อมูล...");
-        } catch (err) { console.log(err); }
+            document.getElementById('status').innerText = "เชื่อมต่อสำเร็จ!";
+            document.getElementById('status').style.color = "#28a745";
+        } catch (error) {
+            console.error(error);
+            document.getElementById('status').innerText = "ล้มเหลว: " + error.message;
+            document.getElementById('status').style.color = "#dc3545";
+        }
     }
 
-    function processData(steps) {
-        if (isNaN(steps)) return;
+    function handleIncomingData(event) {
+        // 1. รับค่า Binary แล้วแปลงเป็น String
+        let decoder = new TextDecoder('utf-8');
+        let rawData = decoder.decode(event.target.value);
+        
+        // 2. ลบช่องว่าง/อักขระพิเศษ (\n)
+        let cleanData = rawData.trim();
+        
+        // 3. แปลงเป็นตัวเลข
+        let steps = parseInt(cleanData);
 
-        let weight = parseFloat(weightInput.value);
-        let dist = (steps * 0.75) / 1000; // แปลงเมตรเป็นกิโลเมตร
-        let cals = steps * 0.0005 * weight; // สูตรตามน้ำหนักตัว
+        if (!isNaN(steps)) {
+            // 4. คำนวณ
+            let distance = (steps * 0.75) / 1000;
+            let calories = steps * 0.04;
 
-        document.getElementById('steps').innerText = steps.toLocaleString();
-        document.getElementById('distance').innerText = dist.toFixed(2);
-        document.getElementById('calories').innerText = cals.toFixed(2);
+            // 5. แสดงผลหน้าจอ
+            const stepEl = document.getElementById('display-steps');
+            stepEl.innerText = steps.toLocaleString();
+            document.getElementById('display-dist').innerText = distance.toFixed(2);
+            document.getElementById('display-cal').innerText = calories.toFixed(2);
 
-        // บันทึกลง LocalStorage
-        const session = {
-            steps: steps,
-            dist: dist.toFixed(2),
-            cals: cals.toFixed(2),
-            time: new Date().toLocaleString()
-        };
-        localStorage.setItem('lastSession', JSON.stringify(session));
-        loadLastSession();
-    }
-
-    function loadLastSession() {
-        const data = localStorage.getItem('lastSession');
-        if(data) {
-            const session = JSON.parse(data);
-            document.getElementById('last-sync').innerText = `${session.time} (${session.steps} ก้าว)`;
-            // แสดงค่าล่าสุดค้างไว้บนหน้าจอ
-            document.getElementById('steps').innerText = session.steps.toLocaleString();
-            document.getElementById('distance').innerText = session.dist;
-            document.getElementById('calories').innerText = session.cals;
+            // เพิ่ม Effect ตัวเลขขยับเล็กน้อยเพื่อให้ดูมีชีวิตชีวา
+            stepEl.style.transform = "scale(1.1)";
+            setTimeout(() => { stepEl.style.transform = "scale(1)"; }, 100);
         }
     }
 </script>
+
 </body>
 </html>
