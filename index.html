@@ -3,78 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micro:bit Runner Stable</title>
+    <title>Smart Pedometer Pro</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        .step-display { font-size: 4.5rem; font-weight: bold; color: #007bff; margin: 15px 0; }
-        button { background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1rem; cursor: pointer; width: 100%; }
-        button:disabled { background: #ccc; }
-        #status { margin-top: 15px; font-size: 0.85rem; color: #666; font-weight: bold; }
+        :root {
+            --primary: #4f46e5;
+            --secondary: #10b981;
+            --dark: #1f2937;
+            --light: #f3f4f6;
+        }
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--dark);
+        }
+        .app-card {
+            background: white;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 30px;
+            padding: 25px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 20px;
+            background: var(--light);
+            color: #6b7280;
+        }
+        .connected { background: #dcfce7; color: #15803d; }
+        
+        .step-circle {
+            width: 200px;
+            height: 200px;
+            border: 10px solid var(--light);
+            border-top: 10px solid var(--primary);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        .step-count { font-size: 3.5rem; font-weight: 800; color: var(--primary); margin: 0; }
+        .step-label { font-size: 1rem; color: #6b7280; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .stat-box {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 20px;
+        }
+        .stat-box span { display: block; font-weight: bold; font-size: 1.2rem; }
+        .stat-box small { color: #6b7280; font-size: 0.75rem; }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
+        button:active { transform: translateY(0); }
+
+        .tip { font-size: 0.85rem; color: #4b5563; background: #eef2ff; padding: 10px; border-radius: 15px; margin-top: 20px; }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<div class="card">
-    <h2>👟 Pedometer Sync</h2>
-    <button id="connectBtn" onclick="connectBluetooth()">เชื่อมต่อ Micro:bit</button>
-    <div class="step-display" id="display-steps">0</div>
-    <div id="status">สถานะ: รอการเชื่อมต่อ</div>
-    <div style="margin-top: 15px; font-size: 0.9rem; color: #444;">
-        ระยะทาง: <span id="display-dist">0.00</span> กม. | แคลอรี่: <span id="display-cal">0.00</span>
+<div class="app-card">
+    <div id="status" class="status-badge">🔴 ยังไม่ได้เชื่อมต่อ</div>
+    
+    <div class="step-circle" id="circle">
+        <p class="step-count" id="steps">0</p>
+        <span class="step-label">ก้าววันนี้</span>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span id="dist">0.00</span>
+            <small>กิโลเมตร</small>
+        </div>
+        <div class="stat-box">
+            <span id="cal">0</span>
+            <small>แคลอรี่ (kcal)</small>
+        </div>
+    </div>
+
+    <button onclick="connectBT()">เชื่อมต่อกับรองเท้า</button>
+
+    <div class="tip" id="healthTip">
+        💡 เคล็ดลับ: กดปุ่มด้านบนเพื่อเริ่มดึงข้อมูลจาก Micro:bit
     </div>
 </div>
 
 <script>
-    let bluetoothDevice;
-    let uartChar;
+    let uart;
 
-    async function connectBluetooth() {
-        const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-        const TX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+    async function connectBT() {
+        const UUID_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+        const UUID_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
         try {
-            document.getElementById('status').innerText = "กำลังค้นหาอุปกรณ์...";
-            bluetoothDevice = await navigator.bluetooth.requestDevice({
+            const device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: 'BBC micro:bit' }],
-                optionalServices: [SERVICE_UUID]
+                optionalServices: [UUID_SERVICE]
             });
 
-            document.getElementById('status').innerText = "กำลังเชื่อมต่อ GATT Server...";
-            const server = await bluetoothDevice.gatt.connect();
-
-            // *** วิธีแก้ GATT Error: หน่วงเวลา 1 วินาทีเพื่อให้ Server พร้อม ***
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            document.getElementById('status').innerText = "กำลังดึงข้อมูล Service...";
-            const service = await server.getPrimaryService(SERVICE_UUID);
-            uartChar = await service.getCharacteristic(TX_CHAR_UUID);
-
-            await uartChar.startNotifications();
-            uartChar.addEventListener('characteristicvaluechanged', handleData);
+            const server = await device.gatt.connect();
+            document.getElementById('status').innerText = "🟡 กำลังดึงข้อมูล...";
             
-            document.getElementById('status').innerText = "✅ เชื่อมต่อสำเร็จ!";
-            document.getElementById('status').style.color = "green";
-            document.getElementById('connectBtn').disabled = true;
+            await new Promise(r => setTimeout(r, 1000));
+            const service = await server.getPrimaryService(UUID_SERVICE);
+            uart = await service.getCharacteristic(UUID_TX);
 
-        } catch (error) {
-            console.error(error);
-            document.getElementById('status').innerText = "❌ หลุด/ล้มเหลว: " + error.message;
-            document.getElementById('status').style.color = "red";
+            await uart.startNotifications();
+            uart.addEventListener('characteristicvaluechanged', updateUI);
+
+            document.getElementById('status').innerText = "🟢 เชื่อมต่อแล้ว";
+            document.getElementById('status').className = "status-badge connected";
+        } catch (e) {
+            alert("เชื่อมต่อไม่ได้: " + e.message);
         }
     }
 
-    function handleData(event) {
-        let decoder = new TextDecoder('utf-8');
-        let rawData = decoder.decode(event.target.value).trim();
-        let steps = parseInt(rawData);
-
+    function updateUI(event) {
+        let val = new TextDecoder().decode(event.target.value).trim();
+        let steps = parseInt(val);
+        
         if (!isNaN(steps)) {
-            document.getElementById('display-steps').innerText = steps.toLocaleString();
-            document.getElementById('display-dist').innerText = ((steps * 0.75) / 1000).toFixed(2);
-            document.getElementById('display-cal').innerText = (steps * 0.04).toFixed(2);
+            // อัปเดตตัวเลขหลัก
+            document.getElementById('steps').innerText = steps.toLocaleString();
+            
+            // 1. คำนวณระยะทาง (เฉลี่ย 1 ก้าว = 0.7 เมตร)
+            let distance = (steps * 0.7) / 1000;
+            document.getElementById('dist').innerText = distance.toFixed(2);
+            
+            // 2. คำนวณแคลอรี่ (เฉลี่ย 1 ก้าว = 0.04 kcal)
+            let calories = Math.floor(steps * 0.04);
+            document.getElementById('cal').innerText = calories;
+
+            // 3. ปรับเอฟเฟกต์วงกลมตามก้าว
+            let scale = 1 + (steps % 10) / 100;
+            document.getElementById('circle').style.transform = `scale(${scale})`;
+
+            // 4. เปลี่ยนคำแนะนำสุขภาพ
+            let tip = document.getElementById('healthTip');
+            if (steps < 1000) tip.innerText = "🏃 เริ่มต้นได้ดี! เดินต่อไปครับ";
+            else if (steps < 5000) tip.innerText = "✨ สุดยอด! คุณเริ่มเข้าใกล้เป้าหมายแล้ว";
+            else tip.innerText = "🔥 ว้าว! วันนี้คุณเผาผลาญได้เยี่ยมมาก";
         }
     }
 </script>
+
 </body>
 </html>
