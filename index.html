@@ -107,4 +107,91 @@
         <div id="progressBar" class="progress-bar"></div>
     </div>
     <div id="progressText" style="font-size: 0.9rem; color: #6366f1; font-weight: bold;">ความสำเร็จ: 0%</div>
-    <div id="congratsMsg" class="congrats">🎉 สุด
+    <div id="congratsMsg" class="congrats">🎉 สุดยอด! ถึงเป้าหมายแล้ว!</div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span id="dist">0.00</span>
+            <small>กิโลเมตร</small>
+        </div>
+        <div class="stat-box">
+            <span id="cal">0</span>
+            <small>แคลอรี่</small>
+        </div>
+    </div>
+
+    <button onclick="connectBT()">เชื่อมต่อ Micro:bit</button>
+    <div id="status" class="status">สถานะ: รอการเชื่อมต่อ</div>
+</div>
+
+<script>
+    let currentSteps = 0;
+    let uart;
+
+    async function connectBT() {
+        const UUID_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+        const UUID_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ namePrefix: 'BBC micro:bit' }],
+                optionalServices: [UUID_SERVICE]
+            });
+
+            const server = await device.gatt.connect();
+            document.getElementById('status').innerText = "🟡 กำลังซิงค์ข้อมูล...";
+            
+            await new Promise(r => setTimeout(r, 1000));
+            const service = await server.getPrimaryService(UUID_SERVICE);
+            uart = await service.getCharacteristic(UUID_TX);
+
+            await uart.startNotifications();
+            uart.addEventListener('characteristicvaluechanged', (event) => {
+                let val = new TextDecoder().decode(event.target.value).trim();
+                let steps = parseInt(val);
+                if (!isNaN(steps)) {
+                    currentSteps = steps;
+                    updateDashboard();
+                }
+            });
+
+            document.getElementById('status').innerText = "🟢 เชื่อมต่อแล้ว";
+        } catch (e) {
+            alert("ผิดพลาด: " + e.message);
+        }
+    }
+
+    function updateDashboard() {
+        // อัปเดตตัวเลขก้าว
+        document.getElementById('steps').innerText = currentSteps.toLocaleString();
+        
+        // คำนวณระยะทางและแคลอรี่
+        document.getElementById('dist').innerText = ((currentSteps * 0.7) / 1000).toFixed(2);
+        document.getElementById('cal').innerText = Math.floor(currentSteps * 0.04);
+        
+        calculateProgress();
+    }
+
+    function calculateProgress() {
+        const goal = parseInt(document.getElementById('goalInput').value) || 1;
+        let percent = (currentSteps / goal) * 100;
+        if (percent > 100) percent = 100;
+
+        // อัปเดต Progress Bar
+        const bar = document.getElementById('progressBar');
+        bar.style.width = percent + "%";
+        document.getElementById('progressText').innerText = `ความสำเร็จ: ${Math.floor(percent)}%`;
+
+        // เปลี่ยนสีแถบถ้าครบเป้า
+        if (percent >= 100) {
+            bar.style.background = "#22c55e";
+            document.getElementById('congratsMsg').style.display = "block";
+        } else {
+            bar.style.background = "#6366f1";
+            document.getElementById('congratsMsg').style.display = "none";
+        }
+    }
+</script>
+
+</body>
+</html>
