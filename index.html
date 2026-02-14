@@ -3,88 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micro:bit Step Tracker Pro</title>
+    <title>Smart Pedometer V3</title>
     <style>
-        :root { --p: #6366f1; --s: #22c55e; }
-        body { font-family: 'Prompt', sans-serif; background: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; width: 90%; max-width: 400px; border-radius: 25px; padding: 30px; box-shadow: 0 15px 30px rgba(0,0,0,0.1); text-align: center; }
-        .goal-box { background: #f8fafc; padding: 10px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
-        .goal-box input { border: none; background: transparent; font-size: 1.2rem; font-weight: bold; width: 80px; text-align: center; color: var(--p); }
-        .step-val { font-size: 5rem; font-weight: 800; color: #1e293b; margin: 10px 0; line-height: 1; }
-        .progress-bg { background: #e2e8f0; height: 12px; border-radius: 10px; margin: 20px 0; overflow: hidden; }
-        .progress-bar { background: var(--p); width: 0%; height: 100%; transition: 0.5s; }
+        :root { --main: #4f46e5; --bg: #f8fafc; }
+        body { font-family: 'Prompt', sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; color: #1e293b; }
+        .card { background: white; width: 90%; max-width: 400px; border-radius: 30px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); text-align: center; }
+        .steps { font-size: 5rem; font-weight: 800; color: var(--main); margin: 15px 0; }
+        .goal-input { border: 2px solid #e2e8f0; padding: 10px; border-radius: 15px; width: 100px; text-align: center; font-size: 1.1rem; color: var(--main); font-weight: bold; }
+        .progress-box { background: #e2e8f0; height: 15px; border-radius: 10px; margin: 25px 0; overflow: hidden; }
+        .bar { background: var(--main); width: 0%; height: 100%; transition: 0.5s ease-in-out; }
+        button { background: var(--main); color: white; border: none; width: 100%; padding: 18px; border-radius: 20px; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
+        button:active { transform: scale(0.95); }
+        #status { margin-top: 15px; font-size: 0.85rem; padding: 8px; border-radius: 10px; background: #f1f5f9; color: #64748b; }
         .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
-        .stat-item { background: #f8fafc; padding: 10px; border-radius: 15px; font-size: 0.9rem; }
-        .stat-item b { display: block; font-size: 1.2rem; color: #334155; }
-        button { background: var(--p); color: white; border: none; width: 100%; padding: 15px; border-radius: 15px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
-        #status { font-size: 0.8rem; color: #94a3b8; margin-top: 10px; }
+        .stat-card { background: #f8fafc; padding: 12px; border-radius: 15px; border: 1px solid #e2e8f0; }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div class="card">
-    <div class="goal-box">
-        เป้าหมายวันนี้: <input type="number" id="goalInput" value="5000" onchange="updateDash()"> ก้าว
+    <div style="margin-bottom: 20px;">
+        <label style="font-size: 0.9rem; color: #64748b;">เป้าหมายก้าววันนี้:</label><br>
+        <input type="number" id="goal" class="goal-input" value="1000" onchange="updateUI(0)">
     </div>
 
-    <div class="step-val" id="stepsText">0</div>
-    <div style="color: #64748b;">ก้าวที่เดินแล้ว</div>
+    <div class="steps" id="stepText">0</div>
+    <div style="color: #64748b; font-size: 1rem;">ก้าวที่คุณเดินแล้ว</div>
 
-    <div class="progress-bg"><div id="pBar" class="progress-bar"></div></div>
-    <div id="pPercent" style="color: var(--p); font-weight: bold; font-size: 0.9rem;">ความสำเร็จ: 0%</div>
+    <div class="progress-box"><div id="bar" class="bar"></div></div>
+    <div id="percent" style="font-weight: bold; color: var(--main);">0%</div>
 
     <div class="stats">
-        <div class="stat-item">ระยะทาง (กม.)<b id="distText">0.00</b></div>
-        <div class="stat-item">แคลอรี่ (kcal)<b id="calText">0</b></div>
+        <div class="stat-card">ระยะทาง (กม.)<br><b id="dist">0.00</b></div>
+        <div class="stat-card">แคลอรี่ (kcal)<br><b id="cal">0</b></div>
     </div>
 
-    <button onclick="connect()">เชื่อมต่อ Micro:bit</button>
-    <div id="status">สถานะ: รอการเชื่อมต่อ</div>
+    <button id="btn" onclick="connect()">🔌 เชื่อมต่ออุปกรณ์</button>
+    <div id="status">สถานะ: พร้อมเชื่อมต่อ</div>
 </div>
 
 <script>
-    let steps = 0;
-    let uartChar;
+    let uart;
+    let currentSteps = 0;
 
     async function connect() {
+        const status = document.getElementById('status');
+        const btn = document.getElementById('btn');
+
         try {
+            status.innerText = "🔍 กำลังค้นหา Micro:bit...";
             const device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: 'BBC micro:bit' }],
                 optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
             });
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
-            uartChar = await service.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
 
-            await uartChar.startNotifications();
-            uartChar.addEventListener('characteristicvaluechanged', (e) => {
-                let msg = new TextDecoder().decode(e.target.value).trim();
-                console.log("Data from board:", msg); // เช็กใน Console (F12)
-                let num = parseInt(msg);
-                if (!isNaN(num)) {
-                    steps = num;
-                    updateDash();
+            status.innerText = "⏳ กำลังจับคู่ (Pairing)...";
+            const server = await device.gatt.connect();
+            
+            status.innerText = "📂 กำลังดึงข้อมูล Service...";
+            const service = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+            uart = await service.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
+
+            await uart.startNotifications();
+            uart.addEventListener('characteristicvaluechanged', (e) => {
+                let val = new TextDecoder().decode(e.target.value).trim();
+                let steps = parseInt(val);
+                if (!isNaN(steps)) {
+                    currentSteps = steps;
+                    updateUI(steps);
                 }
             });
 
-            document.getElementById('status').innerText = "🟢 เชื่อมต่อแล้ว";
+            status.innerText = "✅ เชื่อมต่อสำเร็จ!";
+            status.style.background = "#dcfce7";
+            status.style.color = "#15803d";
+            btn.style.display = "none";
+
         } catch (err) {
-            document.getElementById('status').innerText = "❌ ผิดพลาด: " + err.message;
+            status.innerText = "❌ เกิดข้อผิดพลาด: " + err.message;
+            status.style.background = "#fee2e2";
+            status.style.color = "#dc2626";
         }
     }
 
-    function updateDash() {
-        document.getElementById('stepsText').innerText = steps.toLocaleString();
-        document.getElementById('distText').innerText = (steps * 0.0007).toFixed(2);
-        document.getElementById('calText').innerText = Math.floor(steps * 0.04);
+    function updateUI(s) {
+        document.getElementById('stepText').innerText = s.toLocaleString();
+        document.getElementById('dist').innerText = (s * 0.0007).toFixed(2);
+        document.getElementById('cal').innerText = Math.floor(s * 0.04);
 
-        let goal = parseInt(document.getElementById('goalInput').value) || 1;
-        let percent = Math.min((steps / goal) * 100, 100);
-        document.getElementById('pBar').style.width = percent + "%";
-        document.getElementById('pPercent').innerText = `ความสำเร็จ: ${Math.floor(percent)}%`;
+        const goal = parseInt(document.getElementById('goal').value) || 1;
+        let p = Math.min((s / goal) * 100, 100);
+        document.getElementById('bar').style.width = p + "%";
+        document.getElementById('percent').innerText = Math.floor(p) + "%";
         
-        if(percent >= 100) document.getElementById('pBar').style.background = "#22c55e";
+        if(p >= 100) document.getElementById('bar').style.background = "#22c55e";
     }
 </script>
 
